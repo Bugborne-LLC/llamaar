@@ -1,0 +1,46 @@
+name: Auto-Update llama.cpp
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Run every Sunday at midnight UTC
+  workflow_dispatch: # Allows you to manually click "Run" in the GitHub UI
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to push the commit and tag back to the repo
+
+    steps:
+      - name: Checkout Wrapper Repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update Submodule
+        run: |
+          cd llama-cpp
+          git fetch origin
+          git checkout master
+          git pull origin master
+          cd ..
+
+      - name: Check for changes and Commit
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "Changes detected! Committing and tagging..."
+            git add llama-cpp
+            NEW_TAG="v$(date +'%Y.%m.%d')"
+            git commit -m "chore: auto-update llama.cpp to latest master"
+            git tag $NEW_TAG
+            git push origin main --tags
+            echo "Pushed new tag $NEW_TAG. JitPack will build it shortly."
+          else
+            echo "No changes detected. Exiting."
+          fi
